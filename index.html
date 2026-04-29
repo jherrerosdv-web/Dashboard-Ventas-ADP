@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reporte Semanal de Ventas</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --navy: #1F3864;
+    --blue: #2E75B6;
+    --blue-light: #BDD7EE;
+    --blue-xlight: #D6E4F0;
+    --total-bg: #FFF2CC;
+    --total-border: #F0C030;
+    --border: #C8D8E8;
+    --bg: #F4F7FB;
+    --surface: #FFFFFF;
+    --text: #1a1a2e;
+    --text-muted: #5a6a80;
+    --alt-row: #F8FAFD;
+    --green: #34A853;
+    --amber: #FBBC04;
+    --red: #EA4335;
+    --indigo: #4A6CF7;
+    --radius: 8px;
+    --shadow: 0 1px 4px rgba(31,56,100,0.10);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'IBM Plex Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 13px;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .site-header {
+    background: var(--navy);
+    padding: 0 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+  }
+  .site-header .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #fff;
+  }
+  .site-header .brand-icon {
+    width: 32px; height: 32px;
+    background: var(--blue);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px; font-weight: 500; color: #fff;
+  }
+  .site-header .brand-name { font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
+  .site-header .brand-sub { font-size: 11px; opacity: 0.6; margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .week-pill {
+    background: rgba(255,255,255,0.12);
+    color: #fff;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+  .save-btn {
+    background: var(--blue);
+    color: #fff;
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-family: 'IBM Plex Sans', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .save-btn:hover { background: #1a5a9a; }
+  .saved-toast {
+    position: fixed; top: 68px; right: 24px;
+    background: var(--green); color: #fff;
+    padding: 8px 16px; border-radius: 6px;
+    font-size: 12px; font-weight: 500;
+    opacity: 0; pointer-events: none;
+    transition: opacity .25s;
+    z-index: 999;
+  }
+  .saved-toast.show { opacity: 1; }
+
+  /* ── Layout ── */
+  .layout { display: flex; min-height: calc(100vh - 56px); }
+  .sidebar {
+    width: 200px; min-width: 200px;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 20px 0;
+    position: sticky;
+    top: 56px;
+    height: calc(100vh - 56px);
+    overflow-y: auto;
+  }
+  .sidebar-section { padding: 0 12px; margin-bottom: 6px; }
+  .sidebar-label {
+    font-size: 10px; font-weight: 600; color: var(--text-muted);
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 0 8px; margin-bottom: 4px;
+  }
+  .nav-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px; font-weight: 400;
+    color: var(--text-muted);
+    transition: all .12s;
+    border: none; background: none; width: 100%; text-align: left;
+  }
+  .nav-item:hover { background: var(--bg); color: var(--text); }
+  .nav-item.active { background: var(--blue-xlight); color: var(--navy); font-weight: 600; }
+  .nav-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .main { flex: 1; padding: 24px 28px; overflow-x: auto; }
+
+  /* ── KPI Cards ── */
+  .kpi-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    flex: 1; min-width: 130px;
+    box-shadow: var(--shadow);
+  }
+  .kpi-label { font-size: 11px; color: var(--text-muted); margin-bottom: 5px; font-weight: 500; }
+  .kpi-value { font-size: 22px; font-weight: 600; color: var(--navy); font-family: 'IBM Plex Mono', monospace; }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
+  .kpi-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 8px; }
+  .kpi-bar-fill { height: 100%; border-radius: 2px; background: var(--blue); transition: width .4s; }
+
+  /* ── Charts ── */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    box-shadow: var(--shadow);
+  }
+  .chart-title { font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.05em; }
+  .legend { display: flex; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+  .leg-sq { width: 9px; height: 9px; border-radius: 2px; }
+
+  /* ── Tables ── */
+  .section-header {
+    background: var(--navy);
+    color: #fff;
+    padding: 7px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border-radius: var(--radius) var(--radius) 0 0;
+    margin-top: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 var(--radius) var(--radius);
+    overflow-x: auto;
+    box-shadow: var(--shadow);
+    margin-bottom: 4px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--blue-light);
+    color: var(--navy);
+    font-size: 11px; font-weight: 600;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    text-align: center;
+    white-space: nowrap;
+    position: sticky; top: 0;
+  }
+  thead th.group-e70   { background: #C7D7FF; color: #1a3a9c; }
+  thead th.group-nammi { background: #C6EAC9; color: #1a6e35; }
+  thead th.group-vigo  { background: #FFF0B3; color: #7a5c00; }
+  thead th.group-l7    { background: #F9C9C9; color: #8b1a1a; }
+  thead th.left { text-align: left; }
+  tbody td {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    text-align: center;
+    color: var(--text);
+    font-size: 12px;
+  }
+  tbody td.left { text-align: left; font-weight: 500; }
+  tbody tr:nth-child(odd) td  { background: var(--surface); }
+  tbody tr:nth-child(even) td { background: var(--alt-row); }
+  tbody tr:hover td { background: #EBF3FB; }
+  tfoot td {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    text-align: center;
+    font-size: 12px;
+  }
+  .total-row td {
+    background: var(--total-bg) !important;
+    font-weight: 600;
+    color: var(--navy);
+    border-top: 2px solid var(--total-border);
+    border-bottom: 2px solid var(--total-border);
+  }
+  .proy-row td {
+    background: var(--blue-xlight) !important;
+    color: var(--navy);
+    font-weight: 500;
+  }
+  input[type=number] {
+    width: 70px; padding: 3px 6px;
+    font-size: 12px; font-family: 'IBM Plex Mono', monospace;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: #F0F5FB;
+    color: var(--text);
+    text-align: right;
+    transition: border-color .12s, background .12s;
+  }
+  input[type=number]:focus {
+    outline: none;
+    border-color: var(--blue);
+    background: #fff;
+  }
+  input.pct { width: 58px; }
+
+  /* ── Panel / Tab ── */
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .page-title {
+    font-size: 18px; font-weight: 600; color: var(--navy);
+    margin-bottom: 4px;
+  }
+  .page-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 18px; }
+
+  /* ── Consol overflow ── */
+  .consol-wrap { overflow-x: auto; }
+
+  /* ── RVM styles ── */
+  .rvm-upload-box {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .15s;
+    background: var(--surface);
+    margin-bottom: 24px;
+  }
+  .rvm-upload-box:hover, .rvm-upload-box.drag-over {
+    border-color: var(--blue);
+    background: #EBF3FB;
+  }
+  .rvm-upload-box .upload-icon { font-size: 32px; margin-bottom: 8px; }
+  .rvm-upload-box p { font-size: 13px; color: var(--text-muted); }
+  .rvm-upload-box strong { color: var(--navy); }
+  .rvm-filters {
+    display: flex; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 16px; align-items: center;
+  }
+  .rvm-filters select, .rvm-filters input {
+    padding: 6px 10px; font-size: 12px;
+    border: 1px solid var(--border); border-radius: 6px;
+    background: var(--surface); color: var(--text);
+    font-family: 'IBM Plex Sans', sans-serif;
+  }
+  .rvm-filters label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .rvm-section { margin-bottom: 28px; }
+  .rvm-section-title {
+    font-size: 11px; font-weight: 600; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .06em;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px; margin-bottom: 12px;
+  }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 10px; font-weight: 600;
+  }
+  .badge-ne  { background: #E6F4EA; color: #1a6e35; }
+  .badge-gas { background: #FFF3E0; color: #7a4500; }
+  .rvm-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .rvm-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) {
+    .rvm-grid, .rvm-grid-3 { grid-template-columns: 1fr; }
+  }
+  .files-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+  .file-tag {
+    background: #E8F0FE; color: #1a3a9c;
+    border: 1px solid #B0C4F8;
+    border-radius: 6px; padding: 3px 10px;
+    font-size: 11px; font-weight: 500;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .file-tag button {
+    background: none; border: none; cursor: pointer;
+    color: #1a3a9c; font-size: 13px; line-height: 1; padding: 0;
+  }
+  .rank-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .rank-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
+  .rank-table td:first-child { font-weight: 500; color: var(--navy); }
+  .rank-table td:last-child { text-align: right; font-family: 'IBM Plex Mono', monospace; }
+  .rank-bar-cell { width: 80px; }
+  .rank-bar-bg { background: var(--bg); border-radius: 3px; height: 6px; }
+  .rank-bar-fill { height: 100%; border-radius: 3px; background: var(--blue); transition: width .4s; }
+
+  /* ── Import zone ── */
+  .import-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 32px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .import-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+  .drop-zone {
+    display: flex; align-items: center; gap: 10px;
+    border: 1.5px dashed var(--border);
+    border-radius: 8px;
+    padding: 7px 16px;
+    cursor: pointer;
+    transition: all .15s;
+    background: var(--bg);
+    font-size: 12px; color: var(--text-muted);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--blue);
+    background: #EBF3FB;
+    color: var(--navy);
+  }
+  .drop-zone svg { flex-shrink: 0; }
+  #file-input { display: none; }
+  .import-status {
+    font-size: 12px; font-weight: 500;
+    padding: 5px 12px;
+    border-radius: 6px;
+    display: none;
+  }
+  .import-status.ok  { background: #E6F4EA; color: #1a6e35; display: inline-block; }
+  .import-status.err { background: #FCE4EC; color: #8b1a1a; display: inline-block; }
+  .import-hint { font-size: 11px; color: var(--text-muted); margin-left: auto; }
+
+  @media (max-width: 700px) {
+    .sidebar { display: none; }
+    .main { padding: 14px; }
+    .charts-row { grid-template-columns: 1fr; }
+    .import-bar { padding: 10px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand">
+    <div class="brand-icon">RS</div>
+    <div>
+      <div class="brand-name">Reporte de Ventas</div>
+      <div class="brand-sub">Dashboard semanal</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="week-pill" id="week-pill">Semana —</span>
+    <button class="save-btn" onclick="saveData()">Guardar datos</button>
+  </div>
+</header>
+
+<div class="saved-toast" id="toast">Datos guardados ✓</div>
+
+<!-- Import bar -->
+<div class="import-bar">
+  <span class="import-label">Cargar Excel:</span>
+  <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    Arrastra tu Excel aquí o haz clic para seleccionar
+  </div>
+  <input type="file" id="file-input" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
+  <span class="import-status" id="import-status"></span>
+  <span class="import-hint">Formato: Reporte_Semanal_Ventas.xlsx (una pestaña por modelo)</span>
+</div>
+
+<div class="layout">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main" id="main-content"></main>
+</div>
+
+<script>
+const MODELS  = ['E70','Nammi','Vigo','L7'];
+const DEALERS = ['Indumotora One','Pompeyo Carrasco','Rosselot','Miranda','Alameda','Salazar Israel'];
+const MODEL_COLOR = { E70:'#4A6CF7', Nammi:'#34A853', Vigo:'#FBBC04', L7:'#EA4335' };
+const SALE_FIELDS  = ['meta','fact','res','prosp','leads','sol','penet'];
+const STOCK_FIELDS = ['stock','dias','disp','transito','stockres'];
+
+// ── Week number ──────────────────────────────────────────────────────────
+const now = new Date();
+const start = new Date(now.getFullYear(), 0, 1);
+const wk = Math.ceil(((now - start) / 86400000 + start.getDay() + 1) / 7);
+document.getElementById('week-pill').textContent = `Semana ${wk}`;
+
+// ── Data init ────────────────────────────────────────────────────────────
+function emptyData() {
+  const d = {};
+  MODELS.forEach(m => { d[m] = {}; DEALERS.forEach(dl => { d[m][dl] = {}; }); });
+  return d;
+}
+let data = emptyData();
+try { const s = localStorage.getItem('rpt_ventas'); if (s) data = JSON.parse(s); } catch(e) {}
+function get(m, dl, f) { return Number((data[m]?.[dl]?.[f]) || 0); }
+function set(m, dl, f, v) {
+  if (!data[m]) data[m] = {};
+  if (!data[m][dl]) data[m][dl] = {};
+  data[m][dl][f] = Number(v) || 0;
+}
+function sum(m, f)  { return DEALERS.reduce((a, dl) => a + get(m, dl, f), 0); }
+function avg(m, f)  { return DEALERS.reduce((a, dl) => a + get(m, dl, f), 0) / DEALERS.length; }
+function fmt(n)     { return Math.round(Number(n)||0).toLocaleString('es-CL'); }
+function fmtP(n)    { return (Number(n)||0).toFixed(1) + '%'; }
+
+function saveData() {
+  try { localStorage.setItem('rpt_ventas', JSON.stringify(data)); } catch(e) {}
+  const t = document.getElementById('toast');
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────────
+let activeTab = 'RESUMEN';
+const sidebar = document.getElementById('sidebar');
+
+function buildSidebar() {
+  sidebar.innerHTML = `
+    <div class="sidebar-section">
+      <div class="sidebar-label">Vista general</div>
+      <button class="nav-item active" data-tab="RESUMEN" onclick="switchTab('RESUMEN')">
+        <span class="nav-dot" style="background:#1F3864"></span> Resumen Red
+      </button>
+      <button class="nav-item" data-tab="RVM" onclick="switchTab('RVM')">
+        <span class="nav-dot" style="background:#0F6E56"></span> RVM Mercado
+      </button>
+    </div>
+    <div class="sidebar-section" style="margin-top:8px">
+      <div class="sidebar-label">Por modelo</div>
+      ${MODELS.map(m => `
+        <button class="nav-item" data-tab="${m}" onclick="switchTab('${m}')">
+          <span class="nav-dot" style="background:${MODEL_COLOR[m]}"></span> ${m}
+        </button>`).join('')}
+    </div>`;
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  sidebar.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  const mc = document.getElementById('main-content');
+  if (tab === 'RESUMEN') mc.innerHTML = buildResumen();
+  else if (tab === 'RVM') mc.innerHTML = buildRVM();
+  else mc.innerHTML = buildModel(tab);
+  if (tab !== 'RVM') renderCharts(tab);
+  else renderRVMCharts();
+}
+
+// ── KPI row ──────────────────────────────────────────────────────────────
+function kpiRow(cards) {
+  return `<div class="kpi-row">${cards.map(c => `
+    <div class="kpi-card">
+      <div class="kpi-label">${c.label}</div>
+      <div class="kpi-value">${c.value}</div>
+      ${c.sub ? `<div class="kpi-sub">${c.sub}</div>` : ''}
+      ${c.pct != null ? `<div class="kpi-bar"><div class="kpi-bar-fill" style="width:${Math.min(c.pct,100)}%;background:${c.barColor||'var(--blue)'}"></div></div>` : ''}
+    </div>`).join('')}</div>`;
+}
+
+// ── Model page ───────────────────────────────────────────────────────────
+function buildModel(m) {
+  const meta = sum(m,'meta'), fact = sum(m,'fact'), res = sum(m,'res'), prosp = sum(m,'prosp');
+  const proy = fact + res + prosp;
+  const pct  = meta > 0 ? Math.round(fact/meta*100) : 0;
+
+  const kpis = kpiRow([
+    { label: 'Meta mensual',     value: fmt(meta),          barColor: MODEL_COLOR[m] },
+    { label: 'Facturadas',       value: fmt(fact),          sub: `${pct}% de la meta`, pct, barColor: MODEL_COLOR[m] },
+    { label: 'Proyección cierre',value: fmt(proy),          barColor: MODEL_COLOR[m] },
+    { label: 'Leads totales',    value: fmt(sum(m,'leads')), barColor: MODEL_COLOR[m] },
+    { label: 'Penet. crédito',   value: fmtP(avg(m,'penet')), barColor: MODEL_COLOR[m] },
+    { label: 'Sol / Cot',        value: fmtP(avg(m,'sol')),   barColor: MODEL_COLOR[m] },
+  ]);
+
+  const salesRows = DEALERS.map(dl => `
+    <tr>
+      <td class="left">${dl}</td>
+      ${SALE_FIELDS.map(f => {
+        const isPct = f==='sol'||f==='penet';
+        return `<td><input type="number" ${isPct?'class="pct"':''} min="0" ${isPct?'max="100" step="0.1"':'step="1"'}
+          value="${get(m,dl,f)}" onchange="set('${m}','${dl}','${f}',this.value);refreshModel('${m}')"></td>`;
+      }).join('')}
+    </tr>`).join('');
+
+  const totals = SALE_FIELDS.map(f => {
+    const isPct = f==='sol'||f==='penet';
+    return `<td>${isPct ? fmtP(avg(m,f)) : fmt(sum(m,f))}</td>`;
+  }).join('');
+
+  const stockRows = DEALERS.map(dl => {
+    const st = get(m,dl,'stock'), tr = get(m,dl,'transito'), rv = get(m,dl,'stockres');
+    return `<tr>
+      <td class="left">${dl}</td>
+      ${STOCK_FIELDS.map(f => `<td><input type="number" min="0" step="1" value="${get(m,dl,f)}"
+        onchange="set('${m}','${dl}','${f}',this.value);refreshModel('${m}')"></td>`).join('')}
+      <td id="sd-${m}-${DEALERS.indexOf(dl)}" style="font-weight:600">${fmt(st-tr-rv)}</td>
+    </tr>`;}).join('');
+
+  const stockTotals = STOCK_FIELDS.map(f => `<td>${fmt(sum(m,f))}</td>`).join('');
+  const totalDisp   = DEALERS.reduce((a,dl) => a + get(m,dl,'stock') - get(m,dl,'transito') - get(m,dl,'stockres'), 0);
+
+  return `
+    <div id="model-page-${m}">
+      <div class="page-title" style="color:${MODEL_COLOR[m]}">Modelo ${m}</div>
+      <div class="page-sub">Semana ${wk} — ingresa los datos por dealer</div>
+      ${kpis}
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="chart-title">Avance por dealer</div>
+          <div class="legend">
+            <div class="legend-item"><span class="leg-sq" style="background:#378ADD"></span>Facturadas</div>
+            <div class="legend-item"><span class="leg-sq" style="background:#34A853"></span>Reservadas</div>
+            <div class="legend-item"><span class="leg-sq" style="background:#FBBC04"></span>Prospectos</div>
+          </div>
+          <div style="position:relative;height:200px"><canvas id="chart-bar-${m}" role="img" aria-label="Avance por dealer ${m}"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">Leads vs meta</div>
+          <div class="legend">
+            <div class="legend-item"><span class="leg-sq" style="background:${MODEL_COLOR[m]}"></span>Leads</div>
+            <div class="legend-item"><span class="leg-sq" style="background:#ccc"></span>Meta</div>
+          </div>
+          <div style="position:relative;height:200px"><canvas id="chart-leads-${m}" role="img" aria-label="Leads por dealer ${m}"></canvas></div>
+        </div>
+      </div>
+
+      <div class="section-header">
+        <span style="width:8px;height:8px;border-radius:50%;background:${MODEL_COLOR[m]};display:inline-block"></span>
+        Avance de ventas
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="left">Dealer</th>
+            <th>Meta</th><th>Facturadas</th><th>Reservadas</th>
+            <th>Prospectos</th><th>Leads</th><th>Sol/Cot %</th><th>Penet. %</th>
+          </tr></thead>
+          <tbody>${salesRows}</tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td class="left">▶ Total Red</td>${totals}
+            </tr>
+            <tr class="proy-row">
+              <td class="left" colspan="2">Proyección total de cierre</td>
+              <td colspan="6"><strong>${fmt(proy)}</strong> unidades (fact + res + prosp)</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <div class="section-header" style="margin-top:20px">
+        <span style="width:8px;height:8px;border-radius:50%;background:${MODEL_COLOR[m]};display:inline-block"></span>
+        Stock de la red
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th class="left">Dealer</th>
+            <th>En Stock</th><th>Días Inv.</th><th>Disponible</th>
+            <th>En Tránsito</th><th>Reservado</th><th>Total Disp.</th>
+          </tr></thead>
+          <tbody>${stockRows}</tbody>
+          <tfoot>
+            <tr class="total-row">
+              <td class="left">▶ Total Red</td>${stockTotals}
+              <td style="font-weight:600">${fmt(totalDisp)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>`;
+}
+
+function refreshModel(m) { if (activeTab === m) switchTab(m); }
+
+// ── Resumen consolidado ──────────────────────────────────────────────────
+function buildResumen() {
+  const totalMeta = MODELS.reduce((a,m) => a+sum(m,'meta'), 0);
+  const totalFact = MODELS.reduce((a,m) => a+sum(m,'fact'), 0);
+  const totalProy = MODELS.reduce((a,m) => a+sum(m,'fact')+sum(m,'res')+sum(m,'prosp'), 0);
+  const totalLeads= MODELS.reduce((a,m) => a+sum(m,'leads'), 0);
+  const avPct     = totalMeta > 0 ? Math.round(totalFact/totalMeta*100) : 0;
+
+  const kpis = kpiRow([
+    { label:'Meta total',      value: fmt(totalMeta) },
+    { label:'Facturadas total',value: fmt(totalFact),  sub:`${avPct}% de la meta`, pct:avPct },
+    { label:'Proyección total',value: fmt(totalProy) },
+    { label:'Leads totales',   value: fmt(totalLeads) },
+    ...MODELS.map(m => ({
+      label: `Proy. ${m}`,
+      value: fmt(sum(m,'fact')+sum(m,'res')+sum(m,'prosp')),
+      barColor: MODEL_COLOR[m],
+      pct: sum(m,'meta')>0 ? Math.round((sum(m,'fact')+sum(m,'res')+sum(m,'prosp'))/sum(m,'meta')*100) : 0
+    }))
+  ]);
+
+  // Consolidated table: rows=dealers, col groups=models
+  const varF = ['meta','fact','res','prosp','leads','sol','penet'];
+  const varL = ['Meta','Fact.','Res.','Prosp.','Leads','Sol%','Pen%'];
+  const isPct= f => f==='sol'||f==='penet';
+
+  let thead = `<tr>
+    <th class="left" rowspan="2" style="min-width:130px;background:#1F3864;color:#fff;position:sticky;left:0;z-index:2">Dealer</th>
+    ${MODELS.map(m=>`<th colspan="${varF.length}" class="group-${m.toLowerCase()}">${m}</th>`).join('')}
+    <th rowspan="2" style="background:#1F3864;color:#fff;min-width:80px">Gran Total<br><span style="font-size:10px;opacity:.7">Proy.</span></th>
+  </tr><tr>
+    ${MODELS.map(m=>varL.map(l=>`<th class="group-${m.toLowerCase()}" style="font-size:10px">${l}</th>`).join('')).join('')}
+  </tr>`;
+
+  let tbody = DEALERS.map(dl => {
+    let gran = 0;
+    const cells = MODELS.map(m => {
+      return varF.map(f => {
+        const v = get(m,dl,f);
+        if(f==='fact'||f==='res'||f==='prosp') gran += v;
+        return `<td>${isPct(f)?fmtP(v):fmt(v)}</td>`;
+      }).join('');
+    }).join('');
+    return `<tr>
+      <td class="left" style="position:sticky;left:0;background:var(--surface);z-index:1">${dl}</td>
+      ${cells}
+      <td style="font-weight:600;color:var(--navy)">${fmt(gran)}</td>
+    </tr>`;
+  }).join('');
+
+  let granT = 0;
+  const totalCells = MODELS.map(m => varF.map(f => {
+    const v = isPct(f) ? avg(m,f) : sum(m,f);
+    if((f==='fact'||f==='res'||f==='prosp')&&!isPct(f)) granT += v;
+    return `<td>${isPct(f)?fmtP(v):fmt(v)}</td>`;
+  }).join('')).join('');
+
+  const tfoot = `<tr class="total-row">
+    <td class="left" style="position:sticky;left:0;background:var(--total-bg);z-index:1">▶ Total Red</td>
+    ${totalCells}
+    <td style="font-weight:700;color:var(--navy)">${fmt(granT)}</td>
+  </tr>`;
+
+  return `
+    <div class="page-title">Resumen Red</div>
+    <div class="page-sub">Consolidado de todos los modelos — Semana ${wk}</div>
+    ${kpis}
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Proyección de cierre por modelo</div>
+        <div class="legend">${MODELS.map(m=>`<div class="legend-item"><span class="leg-sq" style="background:${MODEL_COLOR[m]}"></span>${m}</div>`).join('')}</div>
+        <div style="position:relative;height:200px"><canvas id="chart-consol-proy" role="img" aria-label="Proyección por modelo"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Leads totales por modelo</div>
+        <div class="legend">${MODELS.map(m=>`<div class="legend-item"><span class="leg-sq" style="background:${MODEL_COLOR[m]}"></span>${m}</div>`).join('')}</div>
+        <div style="position:relative;height:200px"><canvas id="chart-consol-leads" role="img" aria-label="Leads por modelo"></canvas></div>
+      </div>
+    </div>
+    <div class="section-header">Detalle por dealer — todos los modelos</div>
+    <div class="table-wrap consol-wrap">
+      <table><thead>${thead}</thead><tbody>${tbody}</tbody><tfoot>${tfoot}</tfoot></table>
+    </div>`;
+}
+
+// ── Charts ───────────────────────────────────────────────────────────────
+const charts = {};
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function renderCharts(tab) {
+  if (tab === 'RESUMEN') {
+    destroyChart('cp'); destroyChart('cl');
+    charts['cp'] = new Chart(document.getElementById('chart-consol-proy'), {
+      type: 'bar',
+      data: {
+        labels: MODELS,
+        datasets: [
+          { label:'Proyección', data: MODELS.map(m=>sum(m,'fact')+sum(m,'res')+sum(m,'prosp')), backgroundColor: MODELS.map(m=>MODEL_COLOR[m]) },
+          { label:'Meta', data: MODELS.map(m=>sum(m,'meta')), type:'line', borderColor:'#999', backgroundColor:'transparent', borderDash:[4,3], pointRadius:4, tension:0 }
+        ]
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{font:{size:11}}},y:{ticks:{font:{size:10}}}} }
+    });
+    charts['cl'] = new Chart(document.getElementById('chart-consol-leads'), {
+      type: 'doughnut',
+      data: {
+        labels: MODELS,
+        datasets:[{ data: MODELS.map(m=>sum(m,'leads')), backgroundColor: MODELS.map(m=>MODEL_COLOR[m]), borderWidth:2, borderColor:'#fff' }]
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}} }
+    });
+  } else {
+    const m = tab;
+    destroyChart('bar'+m); destroyChart('leads'+m);
+    charts['bar'+m] = new Chart(document.getElementById('chart-bar-'+m), {
+      type:'bar',
+      data:{
+        labels: DEALERS.map(d=>d.split(' ')[0]),
+        datasets:[
+          { label:'Facturadas', data:DEALERS.map(d=>get(m,d,'fact')), backgroundColor:'#378ADD' },
+          { label:'Reservadas', data:DEALERS.map(d=>get(m,d,'res')),  backgroundColor:'#34A853' },
+          { label:'Prospectos', data:DEALERS.map(d=>get(m,d,'prosp')),backgroundColor:'#FBBC04' },
+        ]
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{autoSkip:false,maxRotation:0,font:{size:9}}},y:{ticks:{font:{size:10}}}} }
+    });
+    charts['leads'+m] = new Chart(document.getElementById('chart-leads-'+m), {
+      type:'bar',
+      data:{
+        labels: DEALERS.map(d=>d.split(' ')[0]),
+        datasets:[
+          { label:'Leads', data:DEALERS.map(d=>get(m,d,'leads')), backgroundColor:MODEL_COLOR[m] },
+          { label:'Meta',  data:DEALERS.map(d=>get(m,d,'meta')),  backgroundColor:'#e0e0e0', borderRadius:2 },
+        ]
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{x:{ticks:{autoSkip:false,maxRotation:0,font:{size:9}}},y:{ticks:{font:{size:10}}}} }
+    });
+  }
+}
+
+// ── Excel import ─────────────────────────────────────────────────────────
+// Column mapping in each model sheet (1-indexed):
+// Row 4 = sub-headers, data starts row 5
+// Col A=dealer, B=meta, C=fact, D=res, E=prosp, F=leads, G=sol, H=penet
+// Stock section starts ~row 15: B=stock, C=dias, D=disp, E=transito, F=stockres
+
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f) handleFile(f);
+});
+
+function handleFile(file) {
+  if (!file) return;
+  const status = document.getElementById('import-status');
+  status.className = 'import-status';
+  status.textContent = '';
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      let loaded = 0;
+
+      MODELS.forEach(model => {
+        const ws = wb.Sheets[model];
+        if (!ws) return;
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: 0 });
+
+        // Find data start row: look for a row where col A matches a known dealer
+        // Our Excel has headers at row 4 (index 3), data from row 5 (index 4)
+        const DATA_ROW = 4; // 0-indexed row 4 = Excel row 5
+
+        DEALERS.forEach((dealer, di) => {
+          const r = rows[DATA_ROW + di];
+          if (!r) return;
+          // Sales fields: B=1,C=2,D=3,E=4,F=5,G=6,H=7
+          set(model, dealer, 'meta',  r[1]);
+          set(model, dealer, 'fact',  r[2]);
+          set(model, dealer, 'res',   r[3]);
+          set(model, dealer, 'prosp', r[4]);
+          set(model, dealer, 'leads', r[5]);
+          set(model, dealer, 'sol',   r[6]);
+          set(model, dealer, 'penet', r[7]);
+        });
+
+        // Find stock section: look for row after "STOCK DE LA RED" header
+        // In our Excel: PROY_ROW = 13 (0-idx=12), STOCK_HDR = 14 (0-idx=13), STOCK_HDR_ROW=15(0-idx=14), data from 16 (0-idx=15)
+        const STOCK_DATA_ROW = 15; // 0-indexed
+
+        DEALERS.forEach((dealer, di) => {
+          const r = rows[STOCK_DATA_ROW + di];
+          if (!r) return;
+          set(model, dealer, 'stock',    r[1]);
+          set(model, dealer, 'dias',     r[2]);
+          set(model, dealer, 'disp',     r[3]);
+          set(model, dealer, 'transito', r[4]);
+          set(model, dealer, 'stockres', r[5]);
+        });
+
+        loaded++;
+      });
+
+      if (loaded === 0) throw new Error('No se encontraron hojas de modelos');
+
+      // Save and refresh
+      try { localStorage.setItem('rpt_ventas', JSON.stringify(data)); } catch(e) {}
+      switchTab(activeTab);
+
+      status.className = 'import-status ok';
+      status.textContent = `✓ ${loaded} modelo${loaded>1?'s':''} cargado${loaded>1?'s':''} correctamente`;
+      dropZone.querySelector('svg').style.stroke = '#1a6e35';
+      setTimeout(() => { dropZone.querySelector('svg').style.stroke = ''; }, 3000);
+
+    } catch(err) {
+      status.className = 'import-status err';
+      status.textContent = '✕ Error al leer el archivo — verifica que sea el formato correcto';
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ══════════════════════════════════════════════════════════════
+// RVM DATA ENGINE
+// ══════════════════════════════════════════════════════════════
+let rvmData = []; // all loaded rows across files
+let rvmFiles = []; // { name, rows }
+const NE_TYPES = ['DUAL GASOLINA ELECTRICO','ELECTRICIDAD','DUAL ELECTRICO GNC','DUAL GASOLINA GNP'];
+
+function isNE(row) { return NE_TYPES.includes(row['Combustible']); }
+
+// Persist RVM data
+function saveRVM() {
+  try { localStorage.setItem('rvm_data', JSON.stringify({files: rvmFiles, rows: rvmData})); } catch(e) {}
+}
+function loadRVM() {
+  try {
+    const s = localStorage.getItem('rvm_data');
+    if (s) { const d = JSON.parse(s); rvmFiles = d.files || []; rvmData = d.rows || []; }
+  } catch(e) {}
+}
+loadRVM();
+
+function removeRVMFile(name) {
+  rvmFiles = rvmFiles.filter(f => f.name !== name);
+  rvmData = rvmFiles.flatMap(f => f.rows);
+  saveRVM();
+  switchTab('RVM');
+}
+
+function handleRVMFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets['Export'];
+      if (!ws) { alert('No se encontró la hoja "Export" en el archivo.'); return; }
+      const rows = XLSX.utils.sheet_to_json(ws, { defval: '' });
+      // Remove existing file with same name and add new
+      rvmFiles = rvmFiles.filter(f => f.name !== file.name);
+      rvmFiles.push({ name: file.name, rows });
+      rvmData = rvmFiles.flatMap(f => f.rows);
+      saveRVM();
+      switchTab('RVM');
+    } catch(err) {
+      alert('Error al leer el archivo RVM. Verifica que sea el formato correcto.');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── Filter helpers ────────────────────────────────────────────
+function rvmFiltered() {
+  const seg  = document.getElementById('f-seg')?.value  || 'Todos';
+  const sem  = document.getElementById('f-sem')?.value  || 'Todas';
+  const reg  = document.getElementById('f-reg')?.value  || 'Todas';
+  const tipo = document.getElementById('f-tipo')?.value || 'Todos';
+  return rvmData.filter(r => {
+    if (seg  !== 'Todos' && r['Descripción Segmento'] !== seg)  return false;
+    if (sem  !== 'Todas' && r['Semana'] !== sem)                return false;
+    if (reg  !== 'Todas' && r['Región Adquirente'] !== reg)     return false;
+    if (tipo === 'NE'    && !isNE(r))                           return false;
+    if (tipo === 'Conv'  && isNE(r))                            return false;
+    return true;
+  });
+}
+
+function uniq(arr) { return [...new Set(arr)].filter(Boolean).sort(); }
+function groupSum(rows, key) {
+  const m = {};
+  rows.forEach(r => { const k = r[key] || 'N/D'; m[k] = (m[k]||0) + Number(r['cantidad']||1); });
+  return Object.entries(m).sort((a,b) => b[1]-a[1]);
+}
+function fmtN(n) { return Number(n).toLocaleString('es-CL'); }
+function pct(n, tot) { return tot > 0 ? ((n/tot)*100).toFixed(1)+'%' : '0%'; }
+
+// ── Build RVM page ────────────────────────────────────────────
+function buildRVM() {
+  const rows = rvmData;
+  const hasData = rows.length > 0;
+
+  const segs  = hasData ? uniq(rows.map(r => r['Descripción Segmento'])) : [];
+  const sems  = hasData ? uniq(rows.map(r => r['Semana'])) : [];
+  const regs  = hasData ? uniq(rows.map(r => r['Región Adquirente'])) : [];
+
+  const uploadSection = `
+    <div class="rvm-upload-box" id="rvm-drop"
+      onclick="document.getElementById('rvm-file-input').click()"
+      ondragover="event.preventDefault();this.classList.add('drag-over')"
+      ondragleave="this.classList.remove('drag-over')"
+      ondrop="event.preventDefault();this.classList.remove('drag-over');handleRVMFile(event.dataTransfer.files[0])">
+      <div class="upload-icon">📂</div>
+      <p><strong>Arrastra el Excel RVM aquí</strong> o haz clic para seleccionar</p>
+      <p style="margin-top:4px;font-size:11px">Acepta múltiples archivos semanales — se acumulan automáticamente</p>
+    </div>
+    <input type="file" id="rvm-file-input" accept=".xlsx,.xls" style="display:none"
+      onchange="handleRVMFile(this.files[0])">`;
+
+  if (!hasData) {
+    return `
+      <div class="page-title" style="color:#0F6E56">RVM — Mercado Nuevas Energías</div>
+      <div class="page-sub">Carga los archivos semanales para ver el análisis</div>
+      ${uploadSection}`;
+  }
+
+  const filtered = rvmFiltered();
+  const neRows   = filtered.filter(isNE);
+  const total    = filtered.reduce((a,r) => a + Number(r['cantidad']||1), 0);
+  const totalNE  = neRows.reduce((a,r)   => a + Number(r['cantidad']||1), 0);
+  const shareNE  = total > 0 ? ((totalNE/total)*100).toFixed(1) : 0;
+
+  const byMarca  = groupSum(filtered, 'Marca');
+  const byMarcaNE= groupSum(neRows,   'Marca');
+  const bySeg    = groupSum(filtered, 'Descripción Segmento');
+  const bySegNE  = groupSum(neRows,   'Descripción Segmento');
+  const bySem    = groupSum(filtered, 'Semana');
+  const byReg    = groupSum(neRows,   'Región Adquirente');
+  const byModNE  = groupSum(neRows,   'Modelo Homologado');
+  const byComb   = groupSum(neRows,   'Combustible');
+  const bestSem  = bySem.length ? bySem[0][0] : '—';
+  const bestSemV = bySem.length ? bySem[0][1] : 0;
+
+  const topMarca = byMarca[0]?.[0] || '—';
+
+  function rankTable(items, total, color='#2E75B6', limit=10) {
+    const max = items[0]?.[1] || 1;
+    return `<table class="rank-table">
+      ${items.slice(0,limit).map(([k,v]) => `<tr>
+        <td>${k}</td>
+        <td class="rank-bar-cell"><div class="rank-bar-bg"><div class="rank-bar-fill" style="width:${Math.round(v/max*100)}%;background:${color}"></div></div></td>
+        <td>${fmtN(v)}</td>
+        <td style="color:var(--text-muted);font-size:11px">${pct(v,total)}</td>
+      </tr>`).join('')}
+    </table>`;
+  }
+
+  const filters = `
+    <div class="rvm-filters">
+      <label>Segmento:</label>
+      <select id="f-seg" onchange="switchTab('RVM')">
+        <option value="Todos">Todos</option>
+        ${segs.map(s=>`<option ${s===document.getElementById('f-seg')?.value?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <label>Semana:</label>
+      <select id="f-sem" onchange="switchTab('RVM')">
+        <option value="Todas">Todas</option>
+        ${sems.map(s=>`<option ${s===document.getElementById('f-sem')?.value?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <label>Región:</label>
+      <select id="f-reg" onchange="switchTab('RVM')">
+        <option value="Todas">Todas</option>
+        ${regs.map(r=>`<option ${r===document.getElementById('f-reg')?.value?'selected':''}>${r}</option>`).join('')}
+      </select>
+      <label>Tipo:</label>
+      <select id="f-tipo" onchange="switchTab('RVM')">
+        <option value="Todos">Todos</option>
+        <option value="NE">Solo NE</option>
+        <option value="Conv">Solo Conv.</option>
+      </select>
+    </div>`;
+
+  return `
+    <div class="page-title" style="color:#0F6E56">RVM — Mercado Nuevas Energías</div>
+    <div class="page-sub">Análisis acumulado de ${rvmFiles.length} archivo${rvmFiles.length>1?'s':''} · ${fmtN(rows.length)} registros totales</div>
+
+    ${uploadSection}
+
+    <div class="files-list">
+      ${rvmFiles.map(f=>`<div class="file-tag">📄 ${f.name}
+        <button onclick="removeRVMFile('${f.name}')" title="Eliminar">✕</button>
+      </div>`).join('')}
+    </div>
+
+    ${filters}
+
+    <!-- KPIs generales -->
+    <div class="kpi-row" style="margin-bottom:20px">
+      <div class="kpi-card"><div class="kpi-label">Total ventas mercado</div><div class="kpi-value">${fmtN(total)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Ventas NE</div><div class="kpi-value" style="color:#0F6E56">${fmtN(totalNE)}</div><div class="kpi-sub">Nuevas energías</div><div class="kpi-bar"><div class="kpi-bar-fill" style="width:${shareNE}%;background:#0F6E56"></div></div></div>
+      <div class="kpi-card"><div class="kpi-label">Share NE</div><div class="kpi-value" style="color:#0F6E56">${shareNE}%</div><div class="kpi-sub">del mercado total</div></div>
+      <div class="kpi-card"><div class="kpi-label">Semana más activa</div><div class="kpi-value">${bestSem}</div><div class="kpi-sub">${fmtN(bestSemV)} unidades</div></div>
+      <div class="kpi-card"><div class="kpi-label">Marca líder total</div><div class="kpi-value" style="font-size:16px">${topMarca}</div></div>
+    </div>
+
+    <!-- Gráficos principales -->
+    <div class="rvm-grid" style="margin-bottom:20px">
+      <div class="chart-card">
+        <div class="chart-title">Ventas NE vs Convencional por semana</div>
+        <div style="position:relative;height:220px"><canvas id="rvm-sem-chart" role="img" aria-label="Ventas por semana NE vs Conv"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Distribución por tipo de combustible (NE)</div>
+        <div style="position:relative;height:220px"><canvas id="rvm-comb-chart" role="img" aria-label="Combustible NE"></canvas></div>
+      </div>
+    </div>
+
+    <!-- NE section -->
+    <div class="section-header" style="border-radius:8px 8px 0 0">
+      <span style="background:#0F6E56;width:8px;height:8px;border-radius:50%;display:inline-block"></span>
+      Análisis detallado — Nuevas Energías
+    </div>
+    <div class="table-wrap" style="border-radius:0 0 8px 8px;padding:16px;margin-bottom:20px">
+      <div class="rvm-grid-3">
+        <div class="rvm-section">
+          <div class="rvm-section-title">Top marcas NE</div>
+          ${rankTable(byMarcaNE, totalNE, '#0F6E56')}
+        </div>
+        <div class="rvm-section">
+          <div class="rvm-section-title">Top modelos NE</div>
+          ${rankTable(byModNE, totalNE, '#185FA5')}
+        </div>
+        <div class="rvm-section">
+          <div class="rvm-section-title">Por segmento (NE)</div>
+          ${rankTable(bySegNE, totalNE, '#BA7517')}
+        </div>
+      </div>
+      <div class="rvm-grid" style="margin-top:8px">
+        <div class="rvm-section">
+          <div class="rvm-section-title">NE por región</div>
+          ${rankTable(byReg, totalNE, '#533AB7', 16)}
+        </div>
+        <div>
+          <div class="rvm-section-title">Ventas NE por semana</div>
+          <div style="position:relative;height:220px"><canvas id="rvm-ne-sem-chart" role="img" aria-label="NE por semana"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mercado general -->
+    <div class="section-header" style="border-radius:8px 8px 0 0">
+      <span style="background:#2E75B6;width:8px;height:8px;border-radius:50%;display:inline-block"></span>
+      Mercado general
+    </div>
+    <div class="table-wrap" style="border-radius:0 0 8px 8px;padding:16px">
+      <div class="rvm-grid">
+        <div class="rvm-section">
+          <div class="rvm-section-title">Top marcas mercado total</div>
+          ${rankTable(byMarca, total, '#2E75B6', 15)}
+        </div>
+        <div class="rvm-section">
+          <div class="rvm-section-title">Por segmento</div>
+          ${rankTable(bySeg, total, '#D85A30')}
+        </div>
+      </div>
+      <div class="rvm-section" style="margin-top:12px">
+        <div class="rvm-section-title">Ventas por semana (mercado total)</div>
+        <div style="position:relative;height:200px"><canvas id="rvm-total-sem-chart" role="img" aria-label="Total por semana"></canvas></div>
+      </div>
+    </div>`;
+}
+
+// ── RVM Charts ────────────────────────────────────────────────
+function renderRVMCharts() {
+  if (!rvmData.length) return;
+  const filtered = rvmFiltered();
+  const neRows   = filtered.filter(isNE);
+  const convRows = filtered.filter(r => !isNE(r));
+
+  const sems = uniq(filtered.map(r => r['Semana']));
+
+  function semTotals(rows) {
+    return sems.map(s => rows.filter(r=>r['Semana']===s).reduce((a,r)=>a+Number(r['cantidad']||1),0));
+  }
+
+  // NE vs Conv by semana
+  const c1 = document.getElementById('rvm-sem-chart');
+  if (c1) {
+    destroyChart('rvm-sem');
+    charts['rvm-sem'] = new Chart(c1, {
+      type:'bar',
+      data:{
+        labels: sems,
+        datasets:[
+          { label:'NE',   data:semTotals(neRows),   backgroundColor:'#0F6E56', stack:'s' },
+          { label:'Conv', data:semTotals(convRows), backgroundColor:'#BDD7EE', stack:'s' },
+        ]
+      },
+      options:{ responsive:true, maintainAspectRatio:false,
+        plugins:{legend:{display:true,position:'top',labels:{font:{size:10},boxWidth:10}}},
+        scales:{ x:{stacked:true,ticks:{font:{size:10}}}, y:{stacked:true,ticks:{font:{size:10}}} } }
+    });
+  }
+
+  // Combustible NE donut
+  const c2 = document.getElementById('rvm-comb-chart');
+  if (c2) {
+    destroyChart('rvm-comb');
+    const combData = groupSum(neRows, 'Combustible');
+    charts['rvm-comb'] = new Chart(c2, {
+      type:'doughnut',
+      data:{
+        labels: combData.map(d=>d[0].replace('DUAL ','').replace('GASOLINA ELECTRICO','Híbrido').replace('ELECTRICIDAD','Eléctrico puro')),
+        datasets:[{ data:combData.map(d=>d[1]), backgroundColor:['#0F6E56','#2E75B6','#BA7517','#D85A30'], borderWidth:2, borderColor:'#fff' }]
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right',labels:{font:{size:10},boxWidth:10}}} }
+    });
+  }
+
+  // NE by semana line
+  const c3 = document.getElementById('rvm-ne-sem-chart');
+  if (c3) {
+    destroyChart('rvm-ne-sem');
+    charts['rvm-ne-sem'] = new Chart(c3, {
+      type:'line',
+      data:{
+        labels: sems,
+        datasets:[{ label:'Ventas NE', data:semTotals(neRows), borderColor:'#0F6E56', backgroundColor:'rgba(15,110,86,0.08)', fill:true, tension:.3, pointRadius:5, pointBackgroundColor:'#0F6E56' }]
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{font:{size:10}}}, y:{ticks:{font:{size:10}}} } }
+    });
+  }
+
+  // Total by semana bar
+  const c4 = document.getElementById('rvm-total-sem-chart');
+  if (c4) {
+    destroyChart('rvm-total-sem');
+    charts['rvm-total-sem'] = new Chart(c4, {
+      type:'bar',
+      data:{
+        labels: sems,
+        datasets:[{ label:'Total', data:semTotals(filtered), backgroundColor:'#2E75B6', borderRadius:4 }]
+      },
+      options:{ responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}, scales:{ x:{ticks:{autoSkip:false,font:{size:10}}}, y:{ticks:{font:{size:10}}} } }
+    });
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────
+buildSidebar();
+switchTab('RESUMEN');
+</script>
+</body>
+</html>
